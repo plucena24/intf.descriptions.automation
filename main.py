@@ -3,7 +3,11 @@ import time
 import logging
 from pprint import pprint as pp
 import argparse
+import re
 
+
+#compiled regex to strip extra data
+REGEX = re.compile(r'(.*)(\(.*\))')
 
 def ios_cdp_parser(cdp_output):
 
@@ -33,9 +37,12 @@ def ios_cdp_parser(cdp_output):
         remote_intf = ''
         continue
 
-    # process the device name
+    # process the device name     
       if 'Device ID: ' in i:
         dev_name = i.split('Device ID: ')[-1].upper().strip()
+        match = REGEX.search(dev_name)
+        if match:
+            dev_name = match.group(1)
         continue
 
     # process the device IP
@@ -44,22 +51,25 @@ def ios_cdp_parser(cdp_output):
           ip = i.split('IP address: ')[-1].strip()
           continue
 
-    # process the model - if a Nexus dev is connected,
+    # process the model - if a Nexus dev is connected, 
     # then the output will not show 'cisco'
       if 'Platform: ' in i:
+        (model, junk2) = i.split(',')
+        model = model.split(' ')[-1].upper()
+        continue
 
-        if 'Platform: cisco' in i:
-          (model, junk2) = i.split(',')
-          model = model.split()[2].upper()
-          continue
+        # if 'Platform: cisco' in i:
+        #   (model, junk2) = i.split(',')
+        #   model = model.split()[2].upper()
+        #   continue
 
-        else:
+        # else:
 
-          (model, junk2) = i.split(',')
-          model = model.split()[1].upper()
-          continue
+        #   (model, junk2) = i.split(',')
+        #   model = model.split()[1].upper()
+        #   continue
 
-
+            
     # process the local interface
     # build the dictionary using the local interface as the key
       if 'Interface: ' in i:
@@ -67,14 +77,14 @@ def ios_cdp_parser(cdp_output):
         intf = intf.split()[1]
 
         remote_intf = format_interface_strings(remote_intf.split()[-1])
-
+  
 
         dev_info[intf] = dict(Hostname=dev_name, IP_Address=ip, Model=model, Remote_Device=remote_intf)
-
+   
     logger.info('Finished parsing the IOS CDP Data, returning the dictionary')
 
     # return the dictionary
-    return dev_info
+    return dev_info  
 
 
 
@@ -89,6 +99,7 @@ def nexus_cdp_parser(cdp_output):
     logger = logging.getLogger('__main__')
     logger.info('Nexus Parser Starting...')
 
+    # dev_info dict to hold data
     dev_info = {}
 
     # split the output by the newline char
@@ -106,9 +117,12 @@ def nexus_cdp_parser(cdp_output):
         remote_intf = ''
         continue
 
-    # process the device name
+    # process the device name     
       if 'Device ID:' in i:
         dev_name = i.split('Device ID:')[-1].upper().strip()
+        match = REGEX.search(dev_name)
+        if match:
+            dev_name = match.group(1)
         continue
 
     # process the device IP
@@ -120,7 +134,7 @@ def nexus_cdp_parser(cdp_output):
 
 
 
-    # process the model - if a Nexus dev is connected,
+    # process the model - if a Nexus dev is connected, 
     # then the output will not show 'cisco'
       if 'Platform: ' in i:
 
@@ -128,7 +142,7 @@ def nexus_cdp_parser(cdp_output):
           model = model.split()[1].upper()
           continue
 
-
+        
     # process the local interface
     # build the dictionary using the local interface as the key
       if 'Interface: ' in i:
@@ -137,29 +151,30 @@ def nexus_cdp_parser(cdp_output):
 
         remote_intf = remote_intf.split()[-1]
 
-        remote_intf = format_interface_strings(remote_intf.split()[-1])
+        remote_intf = format_interface_strings(remote_intf.split()[-1])        
 
 
         dev_info[intf] = dict(Hostname=dev_name, IP_Address=ip, Model=model, Remote_Device=remote_intf)
 
 
-
-    logger.info('Finished parsing the NEXUS CDP Data, returning the dictionary')
+    
+    logger.info('Finished parsing the NEXUS CDP Data, returning the dictionary') 
 
     # return the dictionary
-    return dev_info
+    return dev_info 
 
-
+    
 
 
 def generate_config(device_info):
 
-
+    
     ''' generate interface configuration for devices.
     This function takes a dictionary as an argument
-    and returns an str of config such as:
-    'interface TenGigabitEthernet1/1/1 \n
-    description
+    and returns an str of config such as: 
+
+    'interface TenGigabitEthernet1/1/1 \n 
+    description 
     '''
     logger = logging.getLogger('__main__')
     logger.info('Config Generator Starting...')
@@ -174,7 +189,7 @@ def generate_config(device_info):
         description_string = 'description %s__%s__%s__%s'% (device_info[intf]['Hostname'], device_info[intf]['Remote_Device'], device_info[intf]['Model'], device_info[intf]['IP_Address'])
         config_list.append(description_string)
 
-
+  
     logger.info('Finished generating the config - returning the list')
 
     # return config list
@@ -208,9 +223,10 @@ def configure_logging(logging_file, logging_level='INFO'):
 
 def format_interface_strings(remote_intf):
 
-    ''' takes the str representation of the
+    ''' takes the str representation of the 
     remote interface for a given CDP device and
-    formats it to short notation.
+    formats it to short notation. 
+
     Example: GigbitEthernet = Gig
     Example: TenGigabitEthernet = Ten
     '''
@@ -230,6 +246,11 @@ def format_interface_strings(remote_intf):
     elif remote_intf.startswith('Gig'):
 
         remote_intf = remote_intf.replace('GigabitEthernet', 'Gig')
+
+    # Change from 'FastEthernet' to 'Fa'
+    elif remote_intf.startswith('Fa'):
+
+        remote_intf = remote_intf.replace('FastEthernet', 'Fa')
 
     return remote_intf
 
@@ -252,19 +273,19 @@ def main():
 
     # create logger
     logger = configure_logging(logfile)
+    
 
+    # provide creds 
+    dev_creds = dict(username='XXXXXX', password='XXXXXX')
 
-    # provide creds
-    dev_creds = dict(username='XXXX', password='XXXXX')
-
-    device_list = ['dev_host']
+    device_list = ['vna1ds1-wan', 'vna1ds2-wan']
 
     for a_device in device_list:
 
         # instantiate ssh object
         device_obj = ssh_helper.sshHelper(host=a_device, **dev_creds)
 
-        # connect to device
+        # connect to device 
         device_obj.connect()
 
         # send 'show cdp neighbor detail'
@@ -283,7 +304,7 @@ def main():
         device_obj.read_data()
 
         # pass 'output' to cdp_parser, then pass that output
-        # to generate_config. This will return a list of
+        # to generate_config. This will return a list of 
         # Cisco IOS/NX-OS syntax that can iterated over and
         # send through the SSH session to update the description
         # on each device
@@ -312,11 +333,11 @@ def main():
             print
             print "*" * 80
 
-
+        
         if not DEBUG:
 
             for command in commands_to_send:
-
+             
                 # send commands down channel
                 device_obj.chan.send(command + '\n')
                 time.sleep(1)
@@ -329,3 +350,4 @@ if __name__ == "__main__":
 
 
     main()
+
