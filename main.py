@@ -186,7 +186,12 @@ def generate_config(device_info):
     for intf in device_info.keys():
         interface_string = 'interface ' + intf
         config_list.append(interface_string)
-        description_string = 'description %s__%s__%s__%s'% (device_info[intf]['Hostname'], device_info[intf]['Remote_Device'], device_info[intf]['Model'], device_info[intf]['IP_Address'])
+        description_string = 'description {hostname}_{remote_device_intf}_{model}_{ip_addr}'.format(
+            hostname = device_info[intf]['Hostname'], remote_device_intf = device_info[intf]['Remote_Device'],
+            model = device_info[intf]['Model'], ip_addr = device_info[intf]['IP_Address'])
+
+        #description_string = 'description %s__%s__%s__%s'% (device_info[intf]['Hostname'], device_info[intf]['Remote_Device'], device_info[intf]['Model'], device_info[intf]['IP_Address'])
+        
         config_list.append(description_string)
 
   
@@ -276,7 +281,7 @@ def main():
     
 
     # provide creds 
-    dev_creds = dict(username='XXXXXX', password='XXXXXX')
+    dev_creds = dict(username='XXXXX', password='XXXXXX')
 
     device_list = ['vna1ds1-wan', 'vna1ds2-wan']
 
