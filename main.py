@@ -4,6 +4,7 @@ import logging
 from pprint import pprint as pp
 import argparse
 import re
+import os
 
 
 #compiled regex to strip extra data
@@ -259,23 +260,37 @@ def format_interface_strings(remote_intf):
 
     return remote_intf
 
+
+def target_device_file(target_dev_file):
+
+    # open file containing target devices.
+    with open(target_dev_file) as f:
+
+        #return a list of target devices ready to be processed.
+        return f.read().strip().split('\n')
+
+
+
 def main():
 
     DEBUG = True
 
-    parser = argparse.ArgumentParser(description='Cisco IOS/IOS-XE and NX-OS Interface description updater script - based on current CDP data')
-    parser.add_argument('--type', dest = 'type', action = 'store', choices = {'ios', 'nxos'}, default = 'ios', help = 'Specify device type, IOS or NXOS' )
+    parser = argparse.ArgumentParser(description='Cisco IOS/IOS-XE and NX-OS Interface description updater script - based on current CDP data on the network.\
+        Select a device type (ios or nxos) and the script will SSH into all given devices, parse CDP, and configure interface descriptions based on it.')
+    parser.add_argument('--type', dest = 'type', action = 'store', choices = {'ios', 'nxos'}, help = 'Specify device type, IOS or NXOS', required = True)
     #parser.add_argument('--ios', help='Specify that the devices to parse are IOS devices', action='store_true', default=False)
     #parser.add_argument('--nxos', help='Specify that the devices to parse are Nexus devices', action='store_true', default=False)
     parser.add_argument('-l', '--log', help='Log file location', action='store', dest='log_file', type=str, default='C:\\TEMP\\cdp_parser_log.txt')
     #parser.add_argument('--log', help='Log file location', action='store', dest='log_file', type=str, default='C:\\TEMP\\cdp_parser_log.txt')
+    parser.add_argument('-f', '--file', help='File with device IP or FQDN', action = 'store', dest = 'target_devices_input') 
 
     args = parser.parse_args()
 
     # extract attributes from command line args
-    ios = args.ios
-    nxos = args.nxos
+    dev_type = args.type
     logfile = args.log_file
+    target_devices_input = args.target_devices_input
+
 
 
     # create logger
@@ -283,9 +298,14 @@ def main():
     
 
     # provide creds 
-    dev_creds = dict(username='XXXXX', password='XXXXXX')
+    dev_creds = dict(username='XXXXX', password='XXXXX')
 
-    device_list = ['vna1ds1-wan', 'vna1ds2-wan']
+    if target_devices_input:
+        device_list = list(target_device_file(target_devices_input))
+    else:
+        device_list = ['vna1ds1-wan', 'vna1ds2-wan']
+
+    
 
     for a_device in device_list:
 
@@ -317,11 +337,12 @@ def main():
         # on each device
 
         # if its IOS, then call the IOS parser
-        if ios:
+        
+        if dev_type == 'ios':
             commands_to_send = generate_config(ios_cdp_parser(output))
 
         # if its Nexus, then call the Nexus parser
-        elif nxos:
+        elif dev_type == 'nxos':
             commands_to_send = generate_config(nexus_cdp_parser(output))
 
         else:
