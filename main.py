@@ -264,9 +264,11 @@ def main():
     DEBUG = True
 
     parser = argparse.ArgumentParser(description='Cisco IOS/IOS-XE and NX-OS Interface description updater script - based on current CDP data')
-    parser.add_argument('--ios', help='Specify that the devices to parse are IOS devices', action='store_true', default=False)
-    parser.add_argument('--nxos', help='Specify that the devices to parse are Nexus devices', action='store_true', default=False)
-    parser.add_argument('--log', help='Log file location', action='store', dest='log_file', type=str, default='C:\\TEMP\\cdp_parser_log.txt')
+    parser.add_argument('--type', dest = 'type', action = 'store', choices = {'ios', 'nxos'}, default = 'ios', help = 'Specify device type, IOS or NXOS' )
+    #parser.add_argument('--ios', help='Specify that the devices to parse are IOS devices', action='store_true', default=False)
+    #parser.add_argument('--nxos', help='Specify that the devices to parse are Nexus devices', action='store_true', default=False)
+    parser.add_argument('-l', '--log', help='Log file location', action='store', dest='log_file', type=str, default='C:\\TEMP\\cdp_parser_log.txt')
+    #parser.add_argument('--log', help='Log file location', action='store', dest='log_file', type=str, default='C:\\TEMP\\cdp_parser_log.txt')
 
     args = parser.parse_args()
 
