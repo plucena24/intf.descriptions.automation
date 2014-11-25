@@ -7,7 +7,9 @@ import re
 import os
 
 
-#compiled regex to strip extra data
+#compiled regex to strip extra data from Nexus
+#CDP neighbors - hoc3ds1-dz-i.nfcu.net(JAF1724ADHG) -> to hoc3ds1-dz-i.nfcu.net
+
 REGEX = re.compile(r'(.*)(\(.*\))')
 
 def ios_cdp_parser(cdp_output):
@@ -277,7 +279,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='Cisco IOS/IOS-XE and NX-OS Interface description updater script - based on current CDP data on the network.\
         Select a device type (ios or nxos) and the script will SSH into all given devices, parse CDP, and configure interface descriptions based on it.')
-    parser.add_argument('--type', dest = 'type', action = 'store', choices = {'ios', 'nxos'}, help = 'Specify device type, IOS or NXOS', required = True)
+    parser.add_argument('-type', dest = 'type', action = 'store', choices = {'ios', 'nxos'}, help = 'Specify device type, IOS or NXOS', required = True)
     #parser.add_argument('--ios', help='Specify that the devices to parse are IOS devices', action='store_true', default=False)
     #parser.add_argument('--nxos', help='Specify that the devices to parse are Nexus devices', action='store_true', default=False)
     parser.add_argument('-l', '--log', help='Log file location', action='store', dest='log_file', type=str, default='C:\\TEMP\\cdp_parser_log.txt')
@@ -298,7 +300,7 @@ def main():
     
 
     # provide creds 
-    dev_creds = dict(username='XXXXX', password='XXXXX')
+    dev_creds = dict(username='XXXXXX', password='XXSXXXX')
 
     if target_devices_input:
         device_list = list(target_device_file(target_devices_input))
@@ -309,11 +311,16 @@ def main():
 
     for a_device in device_list:
 
+
         # instantiate ssh object
         device_obj = ssh_helper.sshHelper(host=a_device, **dev_creds)
 
+        logger.info("Connecting to %s...", a_device)
+
         # connect to device 
         device_obj.connect()
+
+        logger.info("Collecting CDP data from %s", a_device)
 
         # send 'show cdp neighbor detail'
         device_obj.chan.send('show cdp neighbor detail\n')
@@ -323,12 +330,6 @@ def main():
 
         # receive buffer
         output = device_obj.read_data()
-
-        # enter config mode
-        device_obj.chan.send('configure terminal' + '\n')
-
-        # receive buffer
-        device_obj.read_data()
 
         # pass 'output' to cdp_parser, then pass that output
         # to generate_config. This will return a list of 
@@ -364,12 +365,22 @@ def main():
         
         if not DEBUG:
 
+            logger.info("Updating interface descriptions on %s...", a_device)
+
+            # enter config mode
+            device_obj.chan.send('configure terminal' + '\n')
+
+            # receive buffer
+            device_obj.read_data()
+
             for command in commands_to_send:
              
                 # send commands down channel
                 device_obj.chan.send(command + '\n')
                 time.sleep(1)
 
+
+        logger.info("Work finished on %s. Disconecting now.", a_device)
 
         device_obj.disconnect()
 
