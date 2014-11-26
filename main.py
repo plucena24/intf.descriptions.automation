@@ -7,13 +7,8 @@ import re
 import os
 
 
-#CDP neighbors - hoc3ds1-dz-i.nfcu.net(JAF1724ADHG) -> to hoc3ds1-dz-i.nfcu.net
-
-#PARENTHESIS_REGEX = re.compile(r'(.*)(\(.*\))')
-#DOMAIN_REGEX = re.compile()
-
-
-#compiled regex to strip extra data
+#CDP neighbors - hoc3ds1-dz-i.nfcu.net(JAF1724ADHG) -> to hoc3ds1-dz-i
+#compiled regex to strip extra data -> remove parenthesis and domain-name.
 
 PARENTHESIS_REGEX = re.compile(r'([a-zA-Z0-9-]*)(\..*\.NET)?(\(.*\))$')
 DOMAIN_REGEX = re.compile(r'([a-zA-Z0-9-]*)(\..*\.NET)$')
@@ -49,20 +44,12 @@ def ios_cdp_parser(cdp_output):
 
     # process the device name     
       if 'Device ID: ' in i:
-        # dev_name = i.split('Device ID: ')[-1].upper().strip() - Nov 25th
-        # dev_name = i.split('Device ID: ')[-1].upper().strip().replace('.NFCU.NET', '') - Nov 26th
 
         # take the last item from the split line, capitalize it, stip newline, 
         # strip parenthesis or domain name.
 
         dev_name = strip_fields(i.split('Device ID: ')[-1].upper().strip())
         
-        # match = PARENTHESIS_REGEX.search(dev_name)
-        # if match:
-        #     dev_name = strip_domain_name(match.group(1))
-        # else:
-        #     dev_name = strip_domain_name(dev_name)
-
         continue
 
     # process the device IP
@@ -77,7 +64,6 @@ def ios_cdp_parser(cdp_output):
         (model, junk2) = i.split(',')
         model = model.split(' ')[-1].upper()
         continue
-
             
     # process the local interface
     # build the dictionary using the local interface as the key
@@ -86,7 +72,6 @@ def ios_cdp_parser(cdp_output):
         intf = intf.split()[1]
 
         remote_intf = format_interface_strings(remote_intf.split()[-1])
-  
 
         dev_info[intf] = dict(Hostname=dev_name, IP_Address=ip, Model=model, Remote_Device=remote_intf)
    
@@ -128,18 +113,11 @@ def nexus_cdp_parser(cdp_output):
 
     # process the device name     
       if 'Device ID:' in i:
-        # dev_name = i.split('Device ID:')[-1].upper().strip().replace('.NFCU.NET', '') 
 
         # take the last item from the split line, capitalize it, stip newline, 
         # strip parenthesis or domain name.
 
         dev_name = strip_fields(i.split('Device ID:')[-1].upper().strip())
-
-        # match = PARENTHESIS_REGEX.search(dev_name)
-        # if match:
-        #     dev_name =  strip_domain_name(match.group(1))
-        # else: 
-        #     dev_name = strip_domain_name(dev_name)
 
         continue
 
@@ -150,8 +128,6 @@ def nexus_cdp_parser(cdp_output):
           ip = i.split('IPv4 Address: ')[-1].strip()
           continue
 
-
-
     # process the model - if a Nexus dev is connected, 
     # then the output will not show 'cisco'
       if 'Platform: ' in i:
@@ -159,8 +135,7 @@ def nexus_cdp_parser(cdp_output):
           (model, junk2) = i.split(',')
           model = model.split()[1].upper()
           continue
-
-        
+      
     # process the local interface
     # build the dictionary using the local interface as the key
       if 'Interface: ' in i:
@@ -171,21 +146,15 @@ def nexus_cdp_parser(cdp_output):
 
         remote_intf = format_interface_strings(remote_intf.split()[-1])        
 
-
         dev_info[intf] = dict(Hostname=dev_name, IP_Address=ip, Model=model, Remote_Device=remote_intf)
-
-
     
     logger.info('Finished parsing the NEXUS CDP Data, returning the dictionary') 
 
     # return the dictionary
-    return dev_info 
-
-    
+    return dev_info   
 
 
 def generate_config(device_info):
-
     
     ''' generate interface configuration for devices.
     This function takes a dictionary as an argument
@@ -207,11 +176,8 @@ def generate_config(device_info):
         description_string = 'description {hostname}_{remote_device_intf}_{model}_{ip_addr}'.format(
             hostname = device_info[intf]['Hostname'], remote_device_intf = device_info[intf]['Remote_Device'],
             model = device_info[intf]['Model'], ip_addr = device_info[intf]['IP_Address'])
-
-        #description_string = 'description %s__%s__%s__%s'% (device_info[intf]['Hostname'], device_info[intf]['Remote_Device'], device_info[intf]['Model'], device_info[intf]['IP_Address'])
-        
+       
         config_list.append(description_string)
-
   
     logger.info('Finished generating the config - returning the list')
 
@@ -222,7 +188,6 @@ def generate_config(device_info):
 def configure_logging(logging_file, logging_level='INFO'):
 
     logger = logging.getLogger('__main__')
-    # logger.setLevel(getattr(logging, logging_level.upper()))
     logger.setLevel(logging_level)
 
     # Format for our loglines
@@ -230,14 +195,12 @@ def configure_logging(logging_file, logging_level='INFO'):
 
     # Setup console logging
     ch = logging.StreamHandler()
-    # ch.setLevel(getattr(logging, logging_level.upper()))
     ch.setLevel(logging_level)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
     # Setup file logging as well
     fh = logging.FileHandler(logging_file)
-    # fh.setLevel(getattr(logging, logging_level.upper()))
     fh.setLevel(logging_level)
     fh.setFormatter(formatter)
     logger.addHandler(fh)
@@ -287,24 +250,6 @@ def target_device_file(target_dev_file):
         return f.read().strip().split('\n')
 
 
-# def strip_domain_name(dev_name_str):
-#     ''' remove the '.NFCU.NET' from the end of 
-#     each device name'''
-
-#     if not isinstance(dev_name_str, str):
-#          raise ValueError('Device name is not a string...something \
-#             went wrong while parsing {}'.format(dev_name_str))
-
-#     pp('DEVICE NAME = {}'.format(dev_name_str))
-
-#     if dev_name_str.endswith('.NFCU.NET'):
-#         pp('RETURNED NAME = {}'.format(dev_name_str.replace('.NFCU.NET', '')))
-#         return dev_name_str.replace('.NFCU.NET', '')
-#     else:
-#         pp('DEVICE NAME = {}'.format(dev_name_str))
-#         return dev_name_str
-
-
 def strip_fields(dev_name_str):
     ''' strip the parenthesis '()' from the Nexus devices
     and the NFCU.NET from all other devices.'''
@@ -313,10 +258,8 @@ def strip_fields(dev_name_str):
          raise ValueError('Device name is not a string...something \
             went wrong while parsing {}'.format(dev_name_str))
 
-
     parenthesis_match = PARENTHESIS_REGEX.search(dev_name_str)
     domain_name_match = DOMAIN_REGEX.search(dev_name_str)
-
 
     if parenthesis_match:
         return parenthesis_match.group(1)
@@ -348,24 +291,20 @@ def main():
     logfile = args.log_file
     target_devices_input = args.target_devices_input
 
-
-
     # create logger
     logger = configure_logging(logfile)
     
 
     # provide creds 
-    dev_creds = dict(username='XXXXXX', password='XXXXXXX')
+    dev_creds = dict(username='XXXXXX', password='XXXXXX')
 
     if target_devices_input:
         device_list = list(target_device_file(target_devices_input))
     else:
         device_list = ['vna1ds1-sf', 'vna1ds2-sf']
-
     
 
     for a_device in device_list:
-
 
         # instantiate ssh object
         device_obj = ssh_helper.sshHelper(host=a_device, **dev_creds)
@@ -444,4 +383,3 @@ if __name__ == "__main__":
 
 
     main()
-
