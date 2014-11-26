@@ -7,10 +7,17 @@ import re
 import os
 
 
-#compiled regex to strip extra data from Nexus
 #CDP neighbors - hoc3ds1-dz-i.nfcu.net(JAF1724ADHG) -> to hoc3ds1-dz-i.nfcu.net
 
-REGEX = re.compile(r'(.*)(\(.*\))')
+#PARENTHESIS_REGEX = re.compile(r'(.*)(\(.*\))')
+#DOMAIN_REGEX = re.compile()
+
+
+#compiled regex to strip extra data
+
+PARENTHESIS_REGEX = re.compile(r'([a-zA-Z0-9-]*)(\..*\.NET)?(\(.*\))$')
+DOMAIN_REGEX = re.compile(r'([a-zA-Z0-9-]*)(\..*\.NET)$')
+
 
 def ios_cdp_parser(cdp_output):
 
@@ -42,10 +49,20 @@ def ios_cdp_parser(cdp_output):
 
     # process the device name     
       if 'Device ID: ' in i:
-        dev_name = i.split('Device ID: ')[-1].upper().strip()
-        match = REGEX.search(dev_name)
-        if match:
-            dev_name = match.group(1)
+        # dev_name = i.split('Device ID: ')[-1].upper().strip() - Nov 25th
+        # dev_name = i.split('Device ID: ')[-1].upper().strip().replace('.NFCU.NET', '') - Nov 26th
+
+        # take the last item from the split line, capitalize it, stip newline, 
+        # strip parenthesis or domain name.
+
+        dev_name = strip_fields(i.split('Device ID: ')[-1].upper().strip())
+        
+        # match = PARENTHESIS_REGEX.search(dev_name)
+        # if match:
+        #     dev_name = strip_domain_name(match.group(1))
+        # else:
+        #     dev_name = strip_domain_name(dev_name)
+
         continue
 
     # process the device IP
@@ -60,17 +77,6 @@ def ios_cdp_parser(cdp_output):
         (model, junk2) = i.split(',')
         model = model.split(' ')[-1].upper()
         continue
-
-        # if 'Platform: cisco' in i:
-        #   (model, junk2) = i.split(',')
-        #   model = model.split()[2].upper()
-        #   continue
-
-        # else:
-
-        #   (model, junk2) = i.split(',')
-        #   model = model.split()[1].upper()
-        #   continue
 
             
     # process the local interface
@@ -122,10 +128,19 @@ def nexus_cdp_parser(cdp_output):
 
     # process the device name     
       if 'Device ID:' in i:
-        dev_name = i.split('Device ID:')[-1].upper().strip()
-        match = REGEX.search(dev_name)
-        if match:
-            dev_name = match.group(1)
+        # dev_name = i.split('Device ID:')[-1].upper().strip().replace('.NFCU.NET', '') 
+
+        # take the last item from the split line, capitalize it, stip newline, 
+        # strip parenthesis or domain name.
+
+        dev_name = strip_fields(i.split('Device ID:')[-1].upper().strip())
+
+        # match = PARENTHESIS_REGEX.search(dev_name)
+        # if match:
+        #     dev_name =  strip_domain_name(match.group(1))
+        # else: 
+        #     dev_name = strip_domain_name(dev_name)
+
         continue
 
     # process the device IP
@@ -272,6 +287,46 @@ def target_device_file(target_dev_file):
         return f.read().strip().split('\n')
 
 
+# def strip_domain_name(dev_name_str):
+#     ''' remove the '.NFCU.NET' from the end of 
+#     each device name'''
+
+#     if not isinstance(dev_name_str, str):
+#          raise ValueError('Device name is not a string...something \
+#             went wrong while parsing {}'.format(dev_name_str))
+
+#     pp('DEVICE NAME = {}'.format(dev_name_str))
+
+#     if dev_name_str.endswith('.NFCU.NET'):
+#         pp('RETURNED NAME = {}'.format(dev_name_str.replace('.NFCU.NET', '')))
+#         return dev_name_str.replace('.NFCU.NET', '')
+#     else:
+#         pp('DEVICE NAME = {}'.format(dev_name_str))
+#         return dev_name_str
+
+
+def strip_fields(dev_name_str):
+    ''' strip the parenthesis '()' from the Nexus devices
+    and the NFCU.NET from all other devices.'''
+  
+    if not isinstance(dev_name_str, str):
+         raise ValueError('Device name is not a string...something \
+            went wrong while parsing {}'.format(dev_name_str))
+
+
+    parenthesis_match = PARENTHESIS_REGEX.search(dev_name_str)
+    domain_name_match = DOMAIN_REGEX.search(dev_name_str)
+
+
+    if parenthesis_match:
+        return parenthesis_match.group(1)
+
+    elif domain_name_match:
+        return domain_name_match.group(1)
+
+    else:
+        return dev_name_str
+
 
 def main():
 
@@ -300,12 +355,12 @@ def main():
     
 
     # provide creds 
-    dev_creds = dict(username='XXXXXX', password='XXSXXXX')
+    dev_creds = dict(username='XXXXXX', password='XXXXXXX')
 
     if target_devices_input:
         device_list = list(target_device_file(target_devices_input))
     else:
-        device_list = ['vna1ds1-wan', 'vna1ds2-wan']
+        device_list = ['vna1ds1-sf', 'vna1ds2-sf']
 
     
 
