@@ -12,6 +12,7 @@ import os
 
 PARENTHESIS_REGEX = re.compile(r'([a-zA-Z0-9-]*)(\..*\.NET)?(\(.*\))$')
 DOMAIN_REGEX = re.compile(r'([a-zA-Z0-9-]*)(\..*\.NET)$')
+INTF_SHORT = re.compile(r'((.*)?Ethernet)')
 
 
 def ios_cdp_parser(cdp_output):
@@ -73,7 +74,8 @@ def ios_cdp_parser(cdp_output):
 
         remote_intf = format_interface_strings(remote_intf.split()[-1])
 
-        dev_info[intf] = dict(Hostname=dev_name, IP_Address=ip, Model=model, Remote_Device=remote_intf)
+        #dev_info[intf] = dict(Hostname=dev_name, IP_Address=ip, Model=model, Remote_Device=remote_intf)
+        dev_info[intf] = dict(dev_name = dev_name, ip_addr = ip, model = model, remote_intf = remote_intf)
    
     logger.info('Finished parsing the IOS CDP Data, returning the dictionary')
 
@@ -146,7 +148,8 @@ def nexus_cdp_parser(cdp_output):
 
         remote_intf = format_interface_strings(remote_intf.split()[-1])        
 
-        dev_info[intf] = dict(Hostname=dev_name, IP_Address=ip, Model=model, Remote_Device=remote_intf)
+        # dev_info[intf] = dict(Hostname=dev_name, IP_Address=ip, Model=model, Remote_Device=remote_intf)
+        dev_info[intf] = dict(dev_name = dev_name, ip_addr = ip, model = model, remote_intf = remote_intf)
     
     logger.info('Finished parsing the NEXUS CDP Data, returning the dictionary') 
 
@@ -171,11 +174,12 @@ def generate_config(device_info):
     # loop through dict of dicts and generate the description config
 
     for intf in device_info.keys():
+
         interface_string = 'interface ' + intf
+
         config_list.append(interface_string)
-        description_string = 'description {hostname}_{remote_device_intf}_{model}_{ip_addr}'.format(
-            hostname = device_info[intf]['Hostname'], remote_device_intf = device_info[intf]['Remote_Device'],
-            model = device_info[intf]['Model'], ip_addr = device_info[intf]['IP_Address'])
+
+        description_string = 'description {0[dev_name]}_{0[remote_intf]}_{0[model]}_{0[ip_addr]}'.format(device_info[intf])
        
         config_list.append(description_string)
   
@@ -217,28 +221,33 @@ def format_interface_strings(remote_intf):
     Example: TenGigabitEthernet = Ten
     '''
 
-    # Change from 'Ethernet' to 'Eth'
+    interface_mapper = dict(Ethernet='Eth', TenGigabitEthernet='Ten',
+        GigabitEthernet='Gig', FastEthernet='Fa')
+    
+    short_name = INTF_SHORT.match(remote_intf)
 
-    if remote_intf.startswith('Ethernet'):
+    return remote_intf.replace(short_name.group(), interface_mapper[short_name.group()]) if short_name else remote_intf
 
-        remote_intf = remote_intf.replace('Ethernet', 'Eth')
+    # if remote_intf.startswith('Ethernet'):
 
-    # Change from 'TenGigabitEthernet' to 'Ten'
-    elif remote_intf.startswith('Ten'):
+    #     remote_intf = remote_intf.replace('Ethernet', 'Eth')
 
-        remote_intf = remote_intf.replace('TenGigabitEthernet', 'Ten')
+    # # Change from 'TenGigabitEthernet' to 'Ten'
+    # elif remote_intf.startswith('Ten'):
 
-    # Change from 'GigabitEthernet' to 'Gig'
-    elif remote_intf.startswith('Gig'):
+    #     remote_intf = remote_intf.replace('TenGigabitEthernet', 'Ten')
 
-        remote_intf = remote_intf.replace('GigabitEthernet', 'Gig')
+    # # Change from 'GigabitEthernet' to 'Gig'
+    # elif remote_intf.startswith('Gig'):
 
-    # Change from 'FastEthernet' to 'Fa'
-    elif remote_intf.startswith('Fa'):
+    #     remote_intf = remote_intf.replace('GigabitEthernet', 'Gig')
 
-        remote_intf = remote_intf.replace('FastEthernet', 'Fa')
+    # # Change from 'FastEthernet' to 'Fa'
+    # elif remote_intf.startswith('Fa'):
 
-    return remote_intf
+    #     remote_intf = remote_intf.replace('FastEthernet', 'Fa')
+
+    # return remote_intf
 
 
 def target_device_file(target_dev_file):
@@ -301,7 +310,7 @@ def main():
     if target_devices_input:
         device_list = list(target_device_file(target_devices_input))
     else:
-        device_list = ['vna1ds1-sf', 'vna1ds2-sf']
+        device_list = ['vna1ds1-wan', 'vna1ds2-wan', 'hoc3as1-31039']
     
 
     for a_device in device_list:
