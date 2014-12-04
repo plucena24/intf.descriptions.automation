@@ -4,7 +4,8 @@ import logging
 from pprint import pprint as pp
 import argparse
 import re
-import os
+from socket import gaierror
+import getpass
 
 
 #CDP neighbors - hoc3ds1-dz-i.nfcu.net(JAF1724ADHG) -> to hoc3ds1-dz-i
@@ -173,7 +174,8 @@ def generate_config(device_info):
 
     # loop through dict of dicts and generate the description config
 
-    for intf in device_info.keys():
+
+    for intf in device_info.iterkeys():
 
         interface_string = 'interface ' + intf
 
@@ -187,6 +189,12 @@ def generate_config(device_info):
 
     # return config list
     return config_list
+
+    # Alternate way to generate config - this returns a generator expression
+    # that can be iterated over while sending commands down the channel.
+
+    # return ('interface {loc_int}\ndescription {dev_data[dev_name]}_{dev_data[remote_intf]}_{dev_data[model]}_{dev_data[ip_addr]}\n'.\
+    #     format(loc_int=intf, dev_data=device_info[intf]) for intf in device_info.iterkeys())
 
 
 def configure_logging(logging_file, logging_level='INFO'):
@@ -226,28 +234,9 @@ def format_interface_strings(remote_intf):
     
     short_name = INTF_SHORT.match(remote_intf)
 
-    return remote_intf.replace(short_name.group(), interface_mapper[short_name.group()]) if short_name else remote_intf
+    return remote_intf.replace(short_name.group(),
 
-    # if remote_intf.startswith('Ethernet'):
-
-    #     remote_intf = remote_intf.replace('Ethernet', 'Eth')
-
-    # # Change from 'TenGigabitEthernet' to 'Ten'
-    # elif remote_intf.startswith('Ten'):
-
-    #     remote_intf = remote_intf.replace('TenGigabitEthernet', 'Ten')
-
-    # # Change from 'GigabitEthernet' to 'Gig'
-    # elif remote_intf.startswith('Gig'):
-
-    #     remote_intf = remote_intf.replace('GigabitEthernet', 'Gig')
-
-    # # Change from 'FastEthernet' to 'Fa'
-    # elif remote_intf.startswith('Fa'):
-
-    #     remote_intf = remote_intf.replace('FastEthernet', 'Fa')
-
-    # return remote_intf
+        interface_mapper[short_name.group()]) if short_name else remote_intf
 
 
 def target_device_file(target_dev_file):
@@ -255,8 +244,15 @@ def target_device_file(target_dev_file):
     # open file containing target devices.
     with open(target_dev_file) as f:
 
+        #pass in a file obj containing devices separated by a '\n'
+        #use a set to remove duplicates from the list, if any, and strip extra white-space.
         #return a list of target devices ready to be processed.
-        return f.read().strip().split('\n')
+
+        devices = set([x.strip() for x in f])
+        return [x for x in devices if x != '']
+
+        # return f.read().strip().split('\n')
+
 
 
 def strip_fields(dev_name_str):
@@ -282,7 +278,9 @@ def strip_fields(dev_name_str):
 
 def main():
 
-    DEBUG = True
+    failed_devices = []
+
+    DEBUG = False
 
     parser = argparse.ArgumentParser(description='Cisco IOS/IOS-XE and NX-OS Interface description updater script - based on current CDP data on the network.\
         Select a device type (ios or nxos) and the script will SSH into all given devices, parse CDP, and configure interface descriptions based on it.')
@@ -305,12 +303,12 @@ def main():
     
 
     # provide creds 
-    dev_creds = dict(username='XXXXXX', password='XXXXXX')
+    dev_creds = dict(username=getpass.getuser(), password=getpass.getpass('Enter your password: '))
 
     if target_devices_input:
         device_list = list(target_device_file(target_devices_input))
     else:
-        device_list = ['vna1ds1-wan', 'vna1ds2-wan', 'hoc3as1-31039']
+        device_list = ['hoc3ds1-31137']
     
 
     for a_device in device_list:
@@ -320,9 +318,14 @@ def main():
 
         logger.info("Connecting to %s...", a_device)
 
-        # connect to device 
-        device_obj.connect()
-
+        # connect to device
+        try:
+            device_obj.connect()
+        except gaierror, e:
+            logger.error('Failed to connect to: %s!. Continuing with the next device, if any...', a_device)
+            failed_devices.append(a_device)
+            continue
+        
         logger.info("Collecting CDP data from %s", a_device)
 
         # send 'show cdp neighbor detail'
@@ -378,14 +381,26 @@ def main():
 
             for command in commands_to_send:
              
-                # send commands down channel
+                # send commands down channel and append a new-line.
+                # pause for .2 seconds after each entered command.
                 device_obj.chan.send(command + '\n')
-                time.sleep(1)
+                time.sleep(.20)
 
 
         logger.info("Work finished on %s. Disconecting now.", a_device)
 
         device_obj.disconnect()
+
+    if failed_devices:
+
+        print
+        print "*" * 80
+        print
+        pp('Out of all devices given, we failed to connect to the following devices: {} . \n\
+            Please verify that the FQDN or IP address being used is reachable and try again.'.format(failed_devices))
+        print
+        print "*" * 80
+        print
 
 
 if __name__ == "__main__":
